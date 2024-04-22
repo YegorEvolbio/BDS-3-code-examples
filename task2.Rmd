@@ -1,0 +1,139 @@
+---
+title: "Лабораторна робота №2"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r}
+wd <- '~/Documents/r_spatial_data'
+setwd(wd)
+library(sf)
+library(tmap)
+```
+
+а) Імпортуємо шейп-файл із картою світу
+
+```{r}
+WorldMap <- st_read("TN2_Donnees/MapMonde.geojson")
+```
+
+б) Дізнаймося систему координат цих даних:
+
+```{r}
+st_crs(WorldMap)$proj4string
+```
+
+в) Дізнаймося кількість країн:
+
+```{r}
+length(WorldMap$Pays)
+```
+
+та кількісь представлених атрибутів
+
+```{r}
+length(WorldMap)
+```
+
+г) За допомогою бібліотеки tmaps зобразимо карту, на якій сусідні країни зображені різними кольорами:
+
+```{r}
+tm_shape(WorldMap) + tm_polygons(col = "MAP_COLORS")
+```
+
+**Завдання 2**
+
+Відтворимо мапу світових викидів CO2.
+
+Для початку трансформуємо наші дані в проєкцію Моллвейда
+
+```{r}
+WorldMap_moll <- st_transform(WorldMap, crs = "+proj=moll +lon_0=0 +x_0=0 +y_0=0 +ellps=WGS84")
+```
+
+Тепер можемо зобразити наші дані у вигляді мапи:
+
+```{r}
+tm_shape(
+  WorldMap_moll
+  ) + 
+tm_polygons(
+  col = "CO2_2018", 
+  border.col = "black",
+  palette = "Oranges",
+  style = "quantile",
+  title = "Викиди CO2 (в метричних тонах на жителя)", 
+  labels = c("від 0.0 до 0.6", "від 0.6 до 1.8", "від 1.8 до 3.7", "від 3.7 до 6.6", "від 6.6 до 32.4"),
+  na.label = "Дані відсутні",
+  legend.hist = T,
+  legend.hist.title = "Розподіл країн по розміру викидів CO2"
+  ) +
+  tm_layout(
+    frame = F,
+    legend.outside = T,
+    legend.outside.position = "bottom",
+    legend.outside.size = 0.45,
+    legend.title.size = 0.8,
+    legend.text.size = 0.5, 
+    legend.hist.height = 0.6, 
+    legend.hist.width= 0.6,
+    legend.stack = 'horizontal'
+    )
+  
+```
+
+**Завдання 2**
+
+Щоб відтворити мапу міграції в світі, нам потрібно додати кілька нових атрибутів до нашого просторового об'єкту.
+
+Розмір популяції в мільйонах осіб. Для цього поділимо значення чисельності країн на мільйон:
+
+```{r}
+WorldMap$PopulationM <- WorldMap$Population2020/1000000
+```
+
+Абсолютне значення міграції в мільйонах осіб:
+
+```{r}
+WorldMap$MigSize <- abs(WorldMap$NetMig_2015.20/1000000)
+```
+
+Та її напрям (еміграція або іміграція):
+
+```{r}
+WorldMap$MigDir[WorldMap$NetMig_2015.20<0] <- "Emigration" 
+WorldMap$MigDir[WorldMap$NetMig_2015.20>=0] <- "Immigration" 
+```
+
+Тепер, маючі ці дані, можемо відтворити мапу:
+
+```{r}
+tm_shape(WorldMap)  + 
+  tm_polygons(
+    border.col = "white",
+    lwd = 0.6,
+    col = "PopulationM", 
+    style = "jenks",
+    palette = "BuPu",
+    title = "Чисельність популяції (в мільйонах осіб)",
+    labels = c("від 0 до 22", "від 22 до 70", "від 70 до 165",  "від 165 до 329", "від 329 до 1,411"),
+    legend.is.portrait = F
+    ) + 
+  tm_bubbles(
+    size = "MigSize",
+    col = "MigDir",
+    palette = "Set1",
+    title.size = "Розмір міграції",
+    title.col = "Напрям міграції",
+    labels = c("Еміграція", "Іміграція")
+  ) +
+  tm_credits("Дані світового банку за 2010-2015 роки") +
+  tm_layout(
+    legend.outside = T,
+    legend.outside.position = "bottom", 
+    legend.outside.size = 0.4,
+    legend.title.size = 1, 
+    legend.text.size = 0.5
+      )
+```

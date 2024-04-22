@@ -1,0 +1,163 @@
+---
+title: 'Lab #3'
+output:
+  word_document: default
+  html_notebook: default
+  html_document:
+    df_print: paged
+always_allow_html: yes
+---
+
+```{r}
+wd <- '~/Documents/r_spatial_data'
+setwd(wd)
+library(webshot)
+library(sf)
+library(mapview)
+```
+
+**Task 1**
+
+```{r}
+Inuit <-st_read('TN3_Donnees/CommunautesAutochtones/INUIT/Communautes_Inuites.shp')
+PN <-st_read('TN3_Donnees/CommunautesAutochtones/PN/Premieres_Nations.shp')
+Provinces <-st_read('TN3_Donnees/CommunautesAutochtones/Provinces/provinces.shp')
+LinguisticTerritories <-st_read('TN3_Donnees/CommunautesAutochtones/TerritoiresLing/TerritoiresLinguistiquesAutochtones.shp')
+```
+
+a) 
+
+```{r}
+st_geometry(Inuit)
+```
+
+```{r}
+st_geometry(PN)
+```
+
+```{r}
+st_geometry(Provinces)
+```
+```{r}
+st_geometry(LinguisticTerritories)
+```
+b) 
+
+```{r}
+st_crs(Inuit)
+```
+
+```{r}
+st_crs(PN)
+```
+
+```{r}
+st_crs(Provinces)
+```
+```{r}
+st_crs(LinguisticTerritories)
+```
+```{r}
+LingTer_nd83 <- st_transform(LinguisticTerritories, 4617)
+Prov_nd83 <- st_transform(Provinces, 4617)
+```
+
+```{r}
+Quebec <- subset(Prov_nd83, Prov_nd83$PRANOM == 'Quebec')
+Inuit_qb <- st_intersection(Inuit, Quebec)
+PN_qb <- st_intersection(PN, Quebec)
+```
+
+```{r}
+Inuit_qb <- Inuit_qb['NAME']
+PN_qb <- PN_qb['BAND_NAME']
+```
+
+```{r}
+names(Inuit_qb)[1] <- "Noms"
+names(PN_qb)[1] <- "Noms"
+```
+
+```{r}
+Indigenous <- rbind(Inuit_qb, PN_qb)
+```
+
+```{r}
+Indigenous <- st_join(Indigenous, LingTer_nd83, left = T)
+```
+
+```{r}
+pops_qb <- read.csv('TN3_Donnees/CommunautesAutochtones/PopulationsAutochtones_Quebec_2019.csv', sep = ';')
+cols_num <- c('Residents', 'NonResidents', 'Total')
+pops_qb[cols_num] <- sapply(pops_qb[cols_num], as.numeric)
+pops_qb <- na.omit(pops_qb)
+```
+
+```{r}
+Indigenous <- merge(Indigenous, pops_qb)
+as.data.frame(Indigenous)
+```
+
+```{r}
+data <- as.data.frame(Indigenous)
+langs<- aggregate(Total ~ terr_ling, data = data, sum)
+langs <- langs[order(langs$Total), ]
+langs
+```
+
+```{r}
+mapview(Quebec) + mapview(Indigenous, cex = 'Total', zcol = "terr_ling", color.regions = hcl.colors(14, palette = "Spectral"))
+```
+
+**Task 2**
+```{r}
+library(raster)
+Luminance <- raster("TN3_Donnees/Luminance/Luminance_Toronto.tif")
+Neighborhoods <- st_read("TN3_Donnees/Luminance/Toronto_quartiers.geojson")
+Routes <-st_read("TN3_Donnees/Luminance/Toronto_routes.geojson")
+```
+
+```{r}
+Luminance <- projectRaster(Luminance, crs = crs(Routes))
+Neighborhoods <- st_transform(Neighborhoods, crs(Routes))
+```
+
+```{r}
+Luminance_Toronto <- mask(Luminance, Neighborhoods)
+mapview(Luminance_Toronto, color.regions = hcl.colors(10, palette = "Plasma")) + mapview(Neighborhoods)
+```
+
+```{r}
+cellStats(Luminance_Toronto, max, na.rm = T)
+```
+
+```{r}
+max_value <- cellStats(Luminance_Toronto, max, na.rm = T)
+xy_max <- xyFromCell(Luminance_Toronto, which(Luminance_Toronto[] == max_value))
+xy_max <- st_as_sf(as.data.frame(xy_max), coords = c(1, 2), crs = crs(Routes))
+
+xy_max
+```
+
+```{r}
+st_intersection(Neighborhoods, xy_max)$Quartier
+```
+
+```{r}
+attributes(Routes)$names
+```
+
+```{r}
+st_crs(Routes)
+```
+
+```{r}
+Routes[st_nearest_feature(xy_max, Routes), ]$LINEAR_NAME_FULL_LEGAL
+```
+
+```{r}
+Routes[Routes$LINEAR_NAME_FULL_LEGAL=="Wellington Street West", ]
+Wellington_Str_W <-st_cast(Routes[Routes$LINEAR_NAME_FULL_LEGAL=="Wellington Street West", ]$geometry, "MULTILINESTRING")
+mapview(Wellington_Str_W)
+```
+

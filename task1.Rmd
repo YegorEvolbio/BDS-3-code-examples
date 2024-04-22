@@ -1,0 +1,185 @@
+---
+title: "Laboratory work #1"
+output:
+  word_document: default
+  pdf_document: default
+always_allow_html: true
+---
+
+```{r}
+wd <- '~/Documents/r_spatial_data'
+setwd(wd)
+library(webshot)
+library(tinytex)
+library(raster)
+library(sf)
+library('mapview')
+```
+
+**Task 1**
+
+To begin with, let's upload the raster 
+
+```{r}
+China_population <- raster(paste0('TN1_Donnees/Chine_population.tif'))
+China_population
+```
+
+a)  Now let's find out raster's dimensions:
+
+```{r}
+dim(China_population)
+```
+
+... and the number of pixels:
+
+```{r}
+ncell(China_population)
+```
+
+b) We need to calculate main statistical parameters: maximum value
+
+```{r}
+maxValue(China_population)
+```
+
+minimum value 
+
+```{r}
+minValue(China_population)
+```
+
+The mean
+
+```{r}
+cellStats(China_population, mean)
+```
+
+And the standard deviation 
+```{r}
+cellStats(China_population, sd)
+```
+
+c)  Raster's Coordinate Reference System can be found out as following:
+
+```{r}
+crs(China_population)
+```
+
+In Proj.4 representation: +proj=moll +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs
+
+d)  The projection used is Mollweid's projection. It belings to the group of pseudocylindrical projections, and it maintains areas
+
+e)  Raster's resolution is:
+
+```{r}
+res(China_population)
+```
+
+Units are meters (from proj.4 representation: "... +units=m ..." )
+
+f)  Let's calculate some statistics on population density. To be able to do this we need to divide each pixel value by  (2000/1000)\^2 = 4 km\^2 - the area of one pixel
+
+```{r}
+China_pop_dens <- China_population/((res(China_population)[1]/1000)^2)
+```
+
+Mean population density:
+
+```{r}
+cellStats(China_pop_dens, mean)
+```
+
+Standard deviation of population density:
+
+```{r}
+cellStats(China_pop_dens, sd)
+```
+
+g)  China's population is:
+
+```{r}
+cellStats(China_population, sum)
+```
+
+or 1.37 billion, wich is almost like Wotld Bank's estimation (1.38 billion)
+
+h)  Let's change the resolution to 10\*10 km\^2
+
+```{r}
+China_pop_10km <- aggregate(China_population, fact = 5, fun = 'sum')
+```
+
+China's population value should be preserved:
+
+```{r}
+cellStats(China_pop_10km, sum)
+```
+
+Everything line's up
+
+```{r}
+China_pop_10km
+```
+
+Now we may plot the aggregated raster:
+
+```{r}
+plot(China_pop_10km, main = "Spatial distribution of China's population\n2015", axes = F, col = hcl.colors(7, palette = 'Plasma'))
+```
+
+**Task 2**
+
+Loading the spatial vector data
+```{r}
+China_regions_admin <-st_read('TN1_Donnees/Chine_regions_admin.shp')
+```
+
+a) Let's find out hte geometry of this data:
+
+```{r}
+st_geometry(China_regions_admin)
+```
+
+b)  The number of elements
+
+```{r}
+length(China_regions_admin$geometry)
+```
+
+Attributes
+```{r}
+length(China_regions_admin)
+```
+
+and attributes' names
+
+```{r}
+names(China_regions_admin)
+```
+
+c) In this layer we can find the following categories of administrative units
+
+```{r}
+unique(China_regions_admin$Categories)
+```
+
+d) This layer's CRS is:
+
+```{r}
+st_crs(China_regions_admin)
+```
+
+It's geographical coordinate system. Now let's project our data to Mollweid representation
+
+```{r}
+China_regions_admin_moll <- st_transform(China_regions_admin, crs(China_population))
+st_crs(China_regions_admin_moll)
+```
+
+e) Using mapview() we can combine our raster and vector data and visualize it as an interactive map
+
+```{r}
+mapview(China_regions_admin_moll, zcol = 'Categories', lwd = 1, layer.name = 'China administrative regions categories', color = hcl.colors(3, palette = 'Zissou1'), legend.position = c("top", "left")) + mapview(China_pop_10km, layer.name = 'China population', col.regions = hcl.colors(n = 7, palette = 'Oslo'), at = 10^seq(0, 7), legend.position = c("bottom", "right"))
+
+```
